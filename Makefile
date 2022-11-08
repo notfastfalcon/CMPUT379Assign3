@@ -1,4 +1,4 @@
-CC = g++ -O
+CC = g++ -O -W
 
 # All Targets
 all: server client
