@@ -69,6 +69,25 @@ void serverConnection(int argc, char* argv[]) {
 		exit(1);
 	}
 	cout << "Using port " << ntohs(address.sin_port) << "\n";
+
+	/***TEST CODE START***/
+
+	char inBuffer[1024] = {};
+	int valread = read(conn_soc, inBuffer, sizeof inBuffer);
+
+	if (valread < 0) {
+		cout << "Error!\n";
+	}
+
+	cout << string(inBuffer) << "\n";
+
+	int count = 1;
+	string outString = "D" + to_string(count);
+	char outBuffer[3] = {};
+	strcpy(outBuffer, outString.c_str());
+	send(conn_soc, outBuffer, sizeof outBuffer, 0);
+
+	/****TEST CODE END ***/
 }
 
 

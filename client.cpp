@@ -8,6 +8,7 @@
 #include <arpa/inet.h>      // inet_aton, htonl, htons
 #include <sys/stat.h>
 #include "bits/stdc++.h"
+#include "sys/time.h"
 #include "header.h"
 using namespace std;
 
@@ -16,6 +17,7 @@ int serv_soc = 0;
 int totalTransactions = 0;
 bool clientSleeping = false;
 
+//tands.cpp function
 extern void Sleep(int n);
 
 
@@ -32,6 +34,17 @@ string getHostName() {
 	hostName += string(host) + "." + to_string(getpid());
 	return hostName;
 }
+
+/**
+ * Prints the current EPOCH time 
+ */
+void printEpochTime() {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	//by default tv_usec gives 6 digits but we just want 2, so we divide by 10000
+	cout << tv.tv_sec << "." << (tv.tv_usec/10000);
+}
+
 
 /**
  * Redirect STDOUT to given Filename
@@ -104,32 +117,70 @@ void clientConnection(int argc, char* argv[]) {
 }
 
 /**
- * Main Client Operations
+ * Main Client Write Operations
  */
-void clientOperations() {
+void clientWriteOperations() {
 	string input = "";
 
 	//input is guaranteed to be correct. So no try catch block implemented.
 	while (cin >> input) {
 		if (input[0] == 'T') {
 			clientSleeping = false;
-			char outBuffer [input.length()] = {};
-			//write here... and then read after
-			outBuffer[0] = 
+			string outString = input.substr(1) + "." + getHostName();
+			char outBuffer[outString.length()] = {};
+			strcpy(outBuffer, outString.c_str());
+
+			//write this command to socket
+			send(serv_soc, outBuffer, sizeof outBuffer, 0);
+
+			//write to log file
+			printEpochTime();
+			cout << ": Send (" << input << ")\n";
+
+			//update transactions sent 
 			totalTransactions++;
 		}
 		else if (input[0] == 'S') {
+			clientSleeping = true;
+			//put client to sleep
 			int units = stoi(input.substr(1));
 			cout << "Sleep " << units << " units\n";
 			clientSleeping = true;
 			Sleep(units);
 		}
+		if (!clientSleeping) {
+			clientReadOperations();
+		}
+	}
+}
+
+/**
+ * Main Client Read Operations
+ */
+void clientReadOperations() {
+	char inBuffer[3] = {};
+	string inString = "";
+
+	//read from socket
+	if (read(serv_soc, inBuffer, sizeof inBuffer) == -1) {
+		cout << "Error reading from Server\n";
+		exit(1);
+	}
+
+	//convert from cstring to string
+	for (unsigned int i = 0; i < strlen(inBuffer); i++) {
+		inString += inBuffer[i];
+	}
+	if (!inString.empty()) {
+		//write to log file
+		printEpochTime();
+		cout << ": Recv (" << inString << ")\n";
 	}
 
 }
 
 /**
- * Close all sockets and close all buffers
+ * Close all sockets
  */
 void closeConnection() {
 	close(serv_soc);
@@ -146,7 +197,7 @@ int main (int argc, char *argv[]) {
 	string filename = getHostName() + ".log";
 	loggedToFile(filename);
 	clientConnection(argc, argv);
-	clientOperations();
+	clientWriteOperations();
 	closeConnection();
 	finalSummary();
 	return 0;

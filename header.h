@@ -7,8 +7,10 @@
 // CLIENT FUNCTIONS
 void clientConnection(int, char*);
 std::string getHostName(void);
+void printEpochTime(void);
 void loggedToFile(std::string);
-void clientOperations(void);
+void clientWriteOperations(void);
+void clientReadOperations(void);
 void closeConnection(void);
 void finalSummary(void);
 
