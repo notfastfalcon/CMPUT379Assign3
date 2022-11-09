@@ -17,6 +17,8 @@ void finalSummary(void);
 // SERVER FUNCTIONS
 void printEpochTime(void);
 void loggedToFile(std::string);
+void printOutput(std::string, int, int);
+void addToUmap(std::string);
 void serverConnection(int, char*);
 void serverOperations(void);
 void closeConnection(void);

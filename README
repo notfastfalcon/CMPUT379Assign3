@@ -1,0 +1,33 @@
+#-----------------------------------------------
+#	Name: Arsh Narkhede
+#	ID: 1645106
+#	CMPUT 379, Fall 2022
+#	Assignment #3: Client-Server/Monitoring
+#-----------------------------------------------
+
+Included Files:
+	> server.cpp
+	> client.cpp
+	> tands.cpp
+	> header.h
+	> Makefile
+	> README
+
+Makefile Targets:
+	- all: executes the executable server and client
+	- server: links all server object files and creates an executable server
+	- server.o: builds the server object file
+	- client: links all client object files and creates an executable client
+	- client.o: builds the client object file
+	- tands.o: builds the tands object file
+	- clean: removes all executables, object files, and log files in the current directory.
+
+
+Code Design:
+	1.
+
+Acknowledgement:
+	> Socket Programming Code is highly inspired from author's CMPUT275 Winter 2021 Assignment 2. The code is courtesy of 
+	the prior mentioned course's instructors and TAs.
+	> The Server implementation of select() is highly inspired from a GeeksForGeeks Code. Link: https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
+
