@@ -145,7 +145,6 @@ void clientWriteOperations() {
 			//put client to sleep
 			int units = stoi(input.substr(1));
 			cout << "Sleep " << units << " units\n";
-			clientSleeping = true;
 			Sleep(units);
 		}
 		if (!clientSleeping) {
@@ -176,7 +175,6 @@ void clientReadOperations() {
 		printEpochTime();
 		cout << ": Recv (" << inString << ")\n";
 	}
-
 }
 
 /**
@@ -193,6 +191,9 @@ void finalSummary() {
 	cout << "Sent " << totalTransactions << " transactions\n";
 }
 
+/**
+ * Driver Code
+ */
 int main (int argc, char *argv[]) {
 	string filename = getHostName() + ".log";
 	loggedToFile(filename);

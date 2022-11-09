@@ -15,7 +15,11 @@ void closeConnection(void);
 void finalSummary(void);
 
 // SERVER FUNCTIONS
+void printEpochTime(void);
+void loggedToFile(std::string);
 void serverConnection(int, char*);
-
+void serverOperations(void);
+void closeConnection(void);
+void finalSummary(void);
 
 #endif
