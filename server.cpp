@@ -53,6 +53,9 @@ void loggedToFile(string filename) {
 
 /**
  * Logs the operation output
+ * @param: hostName: Name of the client 
+ * @param: work: The work to be done by the server
+ * @param: flag: Flag to differentiate work and done outputs
  */
  void printOutput(string hostName, int work, int flag) {
  	printEpochTime();
@@ -68,6 +71,7 @@ void loggedToFile(string filename) {
 
 /**
  * Checks if hostName already exists or not and updates work done accordingly
+ * @param: hostName: Name of the client
  */
 void addToUMap(string hostName) {
 	auto i = workForClient.find(hostName);
@@ -138,36 +142,35 @@ void serverConnection(int argc, char* argv[]) {
 void serverOperations() {
 	int numberOfSockets = 1; //number of clients that are communicating
 	int maxSocketDesc = -1, socketDesc = -1;
-
+	//The following code for select() is inspired from a GeeksForGeek Code 
+	//clear the socket set 
+	FD_ZERO(&fds);
+	//add listening socket to set 
+	FD_SET(lstn_soc, &fds);
+	//we need to track highest file descriptor number to use it for select()
+	maxSocketDesc = lstn_soc;
+	clientSockets.push_back(lstn_soc);
 	while(true) {
-		//The following code for select() is inspired from a GeeksForGeek Code 
-		//clear the socket set 
-        FD_ZERO(&fds);
-        //add listening socket to set 
-        FD_SET(lstn_soc, &fds);
-        //we need to track highest file descriptor number to use it for select()
-        maxSocketDesc = lstn_soc;
-        //add new sockets to set
-        for(int i = 0; i < numberOfSockets; i++) {
-        	//get the socket descriptors from the vector
-        	socketDesc = clientSockets[i];
-        	//add socket decriptor to list
-        	FD_SET(socketDesc, &fds);
-        	//update the highest file descriptor
-        	if(socketDesc > maxSocketDesc) {
-        		maxSocketDesc = socketDesc;
-        	}
-        }
-        
-		timeout.tv_sec = 30; // timeout after 30 seconds
-        if(select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout) == -1) {
-        	cout << "Select Error!\n";
-        	exit(1);
-        }
+		//add new sockets to set
+		for(int i = 0; i < numberOfSockets; i++) {
+			//get the socket descriptors from the vector
+			socketDesc = clientSockets[i];
+			//add socket decriptor to list
+			FD_SET(socketDesc, &fds);
+			//update the highest file descriptor
+			if(socketDesc > maxSocketDesc) {
+				maxSocketDesc = socketDesc;
+			}
+		}
 
-        //If something happened on the listening socket, then its an incoming connection 
-        if (FD_ISSET(lstn_soc, &fds)){
-        	// accept a connection request
+		int activity = select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout);
+		if(activity == -1 && errno != EINTR) {
+			cout << "Select Error!\n";
+			exit(1);
+		}
+		//If something happened on the listening socket, then its an incoming connection 
+		if (FD_ISSET(lstn_soc, &fds)){
+			// accept a connection request
 			conn_soc = accept(lstn_soc, (struct sockaddr *)&clientAddress, (socklen_t*)&addressLen);
 			if(conn_soc == -1) {
 				cout << "Accept Error\n";
@@ -178,44 +181,63 @@ void serverOperations() {
 			numberOfSockets++;
 			//add new socket to the vector
 			clientSockets.push_back(conn_soc);
-
+		}
+		//else its some work on the other socket
+		else {
 			char inBuffer[1024] = {};
-			string inString = "";
-			string outString = "D";
-			//read from socket
-			if (read(conn_soc, inBuffer, sizeof inBuffer) == -1) {
-				cout << "Error reading from Client " << inet_ntoa(clientAddress.sin_addr) <<"\n";
-				exit(1);
-			}
-			//convert from cstring to string
-			for (unsigned int i = 0; i < strlen(inBuffer); i++) {
-				inString += inBuffer[i];
-			}
+			for (auto i = clientSockets.begin(); i != clientSockets.end(); i++) {
+				socketDesc = *i;
+				if (FD_ISSET(socketDesc, &fds)) {
 
-			//start timer after first transaction is received
-			//but do not reset it everytime
-			if(transNumber == 0) {
-				gettimeofday(&startTime, NULL);
-			}
-			size_t posOfFirstDot = inString.find('.');
-			int work = stoi(inString.substr(0, posOfFirstDot));
-			string hostName = inString.substr(posOfFirstDot + 1); 
-			transNumber++;
+					int valread = read(socketDesc, inBuffer, sizeof inBuffer);
+					if (valread == -1) {
+						cout << "Error reading from Client with Socket Description: " << socketDesc <<"\n";
+						exit(1);
+					}
 
-			printOutput(hostName, work, 0);
-			Trans(work);
+					// it was a close socket indication from client
+					if (valread == 0) {  
+						//Close the socket and remove it from vector
+						close(socketDesc);
+						clientSockets.erase(i);
+						numberOfSockets--;
+					}
+					//do the transaction
+					else {
+						string inString = "";
+						string outString = "D";
+						//convert from cstring to string
+						for (unsigned int i = 0; i < strlen(inBuffer); i++) {
+							inString += inBuffer[i];
+						}
 
-			outString += to_string(transNumber);
-			char outBuffer[3] = {};
-			strcpy(outBuffer, outString.c_str());
-			//write done command to socket
-			send(conn_soc, outBuffer, sizeof outBuffer, 0);
+						//start timer after first transaction is received
+						//but do not reset it everytime
+						if(transNumber == 0) {
+							gettimeofday(&startTime, NULL);
+						}
+						size_t posOfFirstDot = inString.find('.');
+						int work = stoi(inString.substr(0, posOfFirstDot));
+						string hostName = inString.substr(posOfFirstDot + 1); 
+						transNumber++;
 
-			printOutput(hostName, work, 1);
-			addToUMap(hostName);
-			//end time after last transaction is over (keep resetting in each iteration)
-			gettimeofday(&endTime, NULL);
-        }
+						printOutput(hostName, work, 0);
+						Trans(work);
+
+						outString += to_string(transNumber);
+						char outBuffer[outString.length()] = {};
+						strcpy(outBuffer, outString.c_str());
+						//write done command to socket
+						send(conn_soc, outBuffer, sizeof outBuffer, 0);
+
+						printOutput(hostName, work, 1);
+						addToUMap(hostName);
+						//end time after last transaction is over (keep resetting in each iteration)
+						gettimeofday(&endTime, NULL);
+					}
+				} 
+            }
+		}
 	}
 
 }
@@ -252,6 +274,8 @@ void finalSummary() {
  * Driver Code
  */
 int main (int argc, char *argv[]) {
+	timeout.tv_sec = 30; //timeout after 30 seconds
+	timeout.tv_usec = 0;
 	string filename = "server.log";
 	loggedToFile(filename);
 	serverConnection(argc, argv);
