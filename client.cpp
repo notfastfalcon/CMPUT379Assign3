@@ -93,6 +93,7 @@ void clientConnection(int argc, char* argv[]) {
 	}
 	// Prepare sockaddr_in structure variable
 	//AF_INET for IPv4
+	memset(&address, '0', sizeof(address));
 	address.sin_family = AF_INET;
 	address.sin_port = htons(SERVER_PORT);
 
