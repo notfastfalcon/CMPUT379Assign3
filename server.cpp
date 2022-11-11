@@ -20,7 +20,7 @@ fd_set fds;
 int addressLen = sizeof(struct sockaddr_in);
 
 struct sockaddr_in address, clientAddress; 
-struct timeval tv, startTime, endTime, timeout;
+struct timeval tv, startTime, endTime;
 
 unordered_map<string, int> workForClient;
 vector<int> clientSockets;
@@ -150,15 +150,15 @@ void serverOperations() {
 	u_long n = 1;
 	ioctl(lstn_soc, FIONBIO, &n);
 
+	//The following code for select() is inspired from a GeeksForGeek Code 
+	//clear the socket set 
+	FD_ZERO(&fds);
+	//add listening socket to set 
+	FD_SET(lstn_soc, &fds);
+
 	while(true) {
-		//The following code for select() is inspired from a GeeksForGeek Code 
-		//clear the socket set 
-		FD_ZERO(&fds);
-		//add listening socket to set 
-		FD_SET(lstn_soc, &fds);
 		//we need to track highest file descriptor number to use it for select()
 		maxSocketDesc = lstn_soc;
-
 		//add new sockets to set, ignore 0 as lstn_soc is at pos 0
 		for(int i = 1; i < numberOfSockets; i++) {
 			//get the socket descriptors from the vector
@@ -171,10 +171,17 @@ void serverOperations() {
 			}
 		}
 
+		struct timeval timeout = {30, 0}; //timeout after 30seconds of inactivity
 		int activity = select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout);
+		
 		if(activity == -1) {
 			cout << "Select Error!\n";
 			exit(1);
+		}
+
+		else if(activity == 0) {
+			//this is when the timer ran out
+			break;
 		}
 
 		//If something happened on the listening socket, then its an incoming connection 
@@ -215,6 +222,10 @@ void serverOperations() {
 							clientSockets.erase(i);
 							numberOfSockets--;
 							close(socketDesc);
+							//clear the socket set 
+							FD_ZERO(&fds);
+							//add listening socket to set 
+							FD_SET(lstn_soc, &fds);
 						}
 
 						else {
@@ -260,10 +271,8 @@ void serverOperations() {
  * Close all sockets and clear the map and vector
  */
 void closeConnection() {
-	close(conn_soc);
 	close(lstn_soc);
 	clientSockets.clear();
-	workForClient.clear();
 }
 
 /**
@@ -273,10 +282,13 @@ void finalSummary() {
 	int totalTrans = 0;
 	cout << "SUMMARY\n";
 	for (auto client : workForClient) {
-		cout << "\t" << client.second << " transactions from " << client.first << "\n";
+		cout << "  " << client.second << " transactions from " << client.first << "\n";
 		totalTrans += client.second;
 	}
-	float execTime = (float) (endTime.tv_sec - startTime.tv_sec) + (float) (pow((endTime.tv_usec - startTime.tv_usec), -6));
+	float execTime = 0.0;
+	if(startTime.tv_usec != endTime.tv_usec) {
+		execTime = (float) (endTime.tv_sec - startTime.tv_sec) + (float) (1e-6*(endTime.tv_usec - startTime.tv_usec));
+	}
 	float transPerSecond = 0.0;
 	if (execTime > 0.0) {
 		transPerSecond = totalTrans/execTime;
@@ -284,14 +296,13 @@ void finalSummary() {
 	printf("%.1f", transPerSecond);
 	cout << " transactions/sec\t(" << totalTrans << "/";
 	printf("%.2f)\n", execTime); 
+	workForClient.clear();
 }
 
 /**
  * Driver Code
  */
 int main (int argc, char *argv[]) {
-	timeout.tv_sec = 30; //timeout after 30 seconds
-	timeout.tv_usec = 0;
 	string filename = "server.log";
 	loggedToFile(filename);
 	serverConnection(argc, argv);
