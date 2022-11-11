@@ -178,9 +178,12 @@ void clientReadOperations() {
 }
 
 /**
- * Close all sockets
+ * Close all sockets and send terminating message to server
  */
 void closeConnection() {
+	//send that all work is done to server
+	char outBuffer[2] = {'Q'};
+	send(serv_soc, outBuffer, sizeof outBuffer, 0);
 	close(serv_soc);
 }
 

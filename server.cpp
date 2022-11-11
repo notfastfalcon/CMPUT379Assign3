@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>      // inet_aton, htonl, htons
 #include <sys/stat.h>
+#include "sys/ioctl.h"      // set non-blocking socket
 #include "bits/stdc++.h"
 #include "sys/time.h"
 #include "unordered_map"
@@ -142,17 +143,24 @@ void serverConnection(int argc, char* argv[]) {
 void serverOperations() {
 	int numberOfSockets = 1; //number of clients that are communicating
 	int maxSocketDesc = -1, socketDesc = -1;
-	//The following code for select() is inspired from a GeeksForGeek Code 
-	//clear the socket set 
-	FD_ZERO(&fds);
-	//add listening socket to set 
-	FD_SET(lstn_soc, &fds);
-	//we need to track highest file descriptor number to use it for select()
-	maxSocketDesc = lstn_soc;
 	clientSockets.push_back(lstn_soc);
+
+	//for timeout to work in select we need to set the socket as non-blocking
+	//Implementation highly inspired from stack overflow code.
+	u_long n = 1;
+	ioctl(lstn_soc, FIONBIO, &n);
+
 	while(true) {
-		//add new sockets to set
-		for(int i = 0; i < numberOfSockets; i++) {
+		//The following code for select() is inspired from a GeeksForGeek Code 
+		//clear the socket set 
+		FD_ZERO(&fds);
+		//add listening socket to set 
+		FD_SET(lstn_soc, &fds);
+		//we need to track highest file descriptor number to use it for select()
+		maxSocketDesc = lstn_soc;
+
+		//add new sockets to set, ignore 0 as lstn_soc is at pos 0
+		for(int i = 1; i < numberOfSockets; i++) {
 			//get the socket descriptors from the vector
 			socketDesc = clientSockets[i];
 			//add socket decriptor to list
@@ -164,10 +172,11 @@ void serverOperations() {
 		}
 
 		int activity = select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout);
-		if(activity == -1 && errno != EINTR) {
+		if(activity == -1) {
 			cout << "Select Error!\n";
 			exit(1);
 		}
+
 		//If something happened on the listening socket, then its an incoming connection 
 		if (FD_ISSET(lstn_soc, &fds)){
 			// accept a connection request
@@ -177,65 +186,70 @@ void serverOperations() {
 				close(conn_soc);
 				exit(1);
 			}
+			//setting new socket as non blocking as well.
+			n = 1;
+			ioctl(lstn_soc, FIONBIO, &n);
 			//update number of clients after a connection was accepted
 			numberOfSockets++;
 			//add new socket to the vector
 			clientSockets.push_back(conn_soc);
 		}
+
 		//else its some work on the other socket
 		else {
 			char inBuffer[1024] = {};
-			for (auto i = clientSockets.begin(); i != clientSockets.end(); i++) {
+			//we ignore clientSocket.begin() as there we have lstn_soc
+			for(auto i = clientSockets.begin() + 1; i < clientSockets.end(); i++) {
 				socketDesc = *i;
 				if (FD_ISSET(socketDesc, &fds)) {
 
 					int valread = read(socketDesc, inBuffer, sizeof inBuffer);
-					if (valread == -1) {
+					if(valread == -1) {
 						cout << "Error reading from Client with Socket Description: " << socketDesc <<"\n";
 						exit(1);
 					}
 
-					// it was a close socket indication from client
-					if (valread == 0) {  
-						//Close the socket and remove it from vector
-						close(socketDesc);
-						clientSockets.erase(i);
-						numberOfSockets--;
-					}
 					//do the transaction
 					else {
-						string inString = "";
-						string outString = "D";
-						//convert from cstring to string
-						for (unsigned int i = 0; i < strlen(inBuffer); i++) {
-							inString += inBuffer[i];
+						if(inBuffer[0] == 'Q') {
+							clientSockets.erase(i);
+							numberOfSockets--;
+							close(socketDesc);
 						}
 
-						//start timer after first transaction is received
-						//but do not reset it everytime
-						if(transNumber == 0) {
-							gettimeofday(&startTime, NULL);
+						else {
+							string inString = "";
+							string outString = "D";
+							//convert from cstring to string
+							for (unsigned int i = 0; i < strlen(inBuffer); i++) {
+								inString += inBuffer[i];
+							}
+							//start timer after first transaction is received
+							//but do not reset it everytime
+							if(transNumber == 0) {
+								gettimeofday(&startTime, NULL);
+							}
+							size_t posOfFirstDot = inString.find('.');
+							int work = stoi(inString.substr(0, posOfFirstDot));
+							string hostName = inString.substr(posOfFirstDot + 1); 
+							transNumber++;
+
+							printOutput(hostName, work, 0);
+							Trans(work);
+
+							outString += to_string(transNumber);
+							char outBuffer[outString.length()] = {};
+							strcpy(outBuffer, outString.c_str());
+							//write done command to socket
+							send(conn_soc, outBuffer, sizeof outBuffer, 0);
+
+							printOutput(hostName, work, 1);
+							addToUMap(hostName);
+							//end time after last transaction is over (keep resetting in each iteration)
+							gettimeofday(&endTime, NULL);
 						}
-						size_t posOfFirstDot = inString.find('.');
-						int work = stoi(inString.substr(0, posOfFirstDot));
-						string hostName = inString.substr(posOfFirstDot + 1); 
-						transNumber++;
-
-						printOutput(hostName, work, 0);
-						Trans(work);
-
-						outString += to_string(transNumber);
-						char outBuffer[outString.length()] = {};
-						strcpy(outBuffer, outString.c_str());
-						//write done command to socket
-						send(conn_soc, outBuffer, sizeof outBuffer, 0);
-
-						printOutput(hostName, work, 1);
-						addToUMap(hostName);
-						//end time after last transaction is over (keep resetting in each iteration)
-						gettimeofday(&endTime, NULL);
 					}
-				} 
+				}
             }
 		}
 	}
@@ -243,11 +257,13 @@ void serverOperations() {
 }
 
 /**
- * Close all sockets
+ * Close all sockets and clear the map and vector
  */
 void closeConnection() {
 	close(conn_soc);
 	close(lstn_soc);
+	clientSockets.clear();
+	workForClient.clear();
 }
 
 /**

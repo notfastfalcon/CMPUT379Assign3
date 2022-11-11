@@ -30,4 +30,5 @@ Acknowledgement:
 	> Socket Programming Code is highly inspired from author's CMPUT275 Winter 2021 Assignment 2. The code is courtesy of 
 	the prior mentioned course's instructors and TAs.
 	> The Server implementation of select() is highly inspired from a GeeksForGeeks Code. Link: https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
+	> https://stackoverflow.com/questions/9847441/setting-socket-timeout
 
