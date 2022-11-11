@@ -116,8 +116,9 @@ void serverConnection(int argc, char* argv[]) {
 
   	// set up the socket (initialize socket parameters)
   	//AF_INET for IPv4
+	memset(&address, '0', sizeof(address));
 	address.sin_family = AF_INET; 
-	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_addr.s_addr = htonl(INADDR_ANY);
 	address.sin_port = htons(PORT);  
 
   	// binding to port
