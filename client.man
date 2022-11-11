@@ -1,0 +1,18 @@
+.TH CLIENT 1 "10 November 2022" "Client Man Page"
+.SH NAME
+Client
+.SH DESCRIPTION
+Client is responsible for sending work to the Server after a successful connection is established.
+.SH SYNOPSIS
+client [SERVER_PORT] [IP ADDRESS]
+.SH ARGUMENTS
+.PP
+Argument 1: Port Number that the server will read from (in the range 5000 to 64000, the same number that server uses)
+.PP
+Argument 2: IP address of the machine that is hosting the server
+.SH BUGS
+No bugs known to the author. It worked as expected by the assignment description.
+.SH SEE ALSO
+SERVER(1)
+.SH AUTHOR
+Arsh Narkhede

@@ -10,6 +10,8 @@ Included Files:
 	> client.cpp
 	> tands.cpp
 	> header.h
+	> client.man
+	> server.man
 	> Makefile
 	> README
 
@@ -20,15 +22,24 @@ Makefile Targets:
 	- client: links all client object files and creates an executable client
 	- client.o: builds the client object file
 	- tands.o: builds the tands object file
+	- manClient: makes a pdf version of man page for the client program
+	- manServer: makes a pdf version of man page for the server program
 	- clean: removes all executables, object files, and log files in the current directory.
 
 
 Code Design:
-	1.
+	1. The client and server communicate using sockets. The server uses the Select() command to synchronously take work from
+	multiple clients. It uses the fd_set data structure.
+	2. The server timesout after 30 seconds of inactivity on any othe socket connections. To implement timeout the sockets were
+	made to be non-blocking.
+	3. The after the client is done reading the input it send a 'Q' indication to the server to close the connection.
+	4. After the server timesout, the summary is printed out.
+	5. The code compiles on the lab machine and runs with multiple machines.
 
 Acknowledgement:
 	> Socket Programming Code is highly inspired from author's CMPUT275 Winter 2021 Assignment 2. The code is courtesy of 
 	the prior mentioned course's instructors and TAs.
 	> The Server implementation of select() is highly inspired from a GeeksForGeeks Code. Link: https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
-	> https://stackoverflow.com/questions/9847441/setting-socket-timeout
+	> Making the socket non-blocking was inspired from a stackOverflow code. Link: https://stackoverflow.com/questions/9847441/
+	setting-socket-timeout
 
