@@ -30,4 +30,4 @@ manServer:
 
 # Clean
 clean: 
-	rm -f *.o *.log *.pdf server client
+	rm -f *.o *.log server.pdf client.pdf server client

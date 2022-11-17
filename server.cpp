@@ -16,10 +16,9 @@
 using namespace std;
 
 int lstn_soc, conn_soc, opt = 1, transNumber = 0;
-fd_set fds;  
-int addressLen = sizeof(struct sockaddr_in);
+fd_set fds; 
 
-struct sockaddr_in address, clientAddress; 
+struct sockaddr_in address; 
 struct timeval tv, startTime, endTime;
 
 unordered_map<string, int> workForClient;
@@ -33,7 +32,6 @@ extern void Trans(int n);
  */
 void printEpochTime() {
 	gettimeofday(&tv, NULL);
-	//by default tv_usec gives 6 digits but we just want 2, so we divide by 10000
 	cout << tv.tv_sec << "." << (tv.tv_usec/10000);
 }
 
@@ -116,20 +114,20 @@ void serverConnection(int argc, char* argv[]) {
 
   	// set up the socket (initialize socket parameters)
   	//AF_INET for IPv4
-	memset(&address, '0', sizeof(address));
+	memset(&address, '0', sizeof address);
 	address.sin_family = AF_INET; 
 	address.sin_addr.s_addr = htonl(INADDR_ANY);
 	address.sin_port = htons(PORT);  
 
   	// binding to port
-	if (bind(lstn_soc, (struct sockaddr *)&address, addressLen) == -1) { 
+	if (bind(lstn_soc, (struct sockaddr *)&address, sizeof address) == -1) { 
   		//error
 		cout << "Unable to bind to port address\n"; 
 		exit(1);
 	}
 
-  	// listen for connection requests with Backlog = 10
-	if (listen(lstn_soc, 10) == -1) {
+  	// listen for connection requests with Backlog = 30 (reasonable limit -> Following Forum Post)
+	if (listen(lstn_soc, 30) == -1) {
   		//error 
 		cout << "Listen failed\n";
 		exit(1);
@@ -156,21 +154,30 @@ void serverOperations() {
 	FD_ZERO(&fds);
 	//add listening socket to set 
 	FD_SET(lstn_soc, &fds);
+	//we need to track highest file descriptor number to use it for select()
+	maxSocketDesc = lstn_soc;
+
+	bool changeInSockets = false;
 
 	while(true) {
-		//we need to track highest file descriptor number to use it for select()
-		maxSocketDesc = lstn_soc;
-		//add new sockets to set, ignore 0 as lstn_soc is at pos 0
-		for(int i = 1; i < numberOfSockets; i++) {
-			//get the socket descriptors from the vector
-			socketDesc = clientSockets[i];
-			//add socket decriptor to list
-			FD_SET(socketDesc, &fds);
-			//update the highest file descriptor
-			if(socketDesc > maxSocketDesc) {
-				maxSocketDesc = socketDesc;
+		//if update on sockets
+		if (changeInSockets) {
+			//reset maxSocketDesc
+			maxSocketDesc = lstn_soc;
+			//add new sockets to set, ignore 0 as lstn_soc is at pos 0
+			for(int i = 1; i < numberOfSockets; i++) {
+				//get the socket descriptors from the vector
+				socketDesc = clientSockets[i];
+				//add socket decriptor to list
+				FD_SET(socketDesc, &fds);
+				//update the highest file descriptor
+				if(socketDesc > maxSocketDesc) {
+					maxSocketDesc = socketDesc;
+				}
 			}
 		}
+		//reset flag
+		changeInSockets = false;
 
 		struct timeval timeout = {30, 0}; //timeout after 30seconds of inactivity
 		int activity = select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout);
@@ -188,7 +195,8 @@ void serverOperations() {
 		//If something happened on the listening socket, then its an incoming connection 
 		if (FD_ISSET(lstn_soc, &fds)){
 			// accept a connection request
-			conn_soc = accept(lstn_soc, (struct sockaddr *)&clientAddress, (socklen_t*)&addressLen);
+			int addressLen = sizeof address;
+			conn_soc = accept(lstn_soc, (struct sockaddr *)&address, (socklen_t*)&addressLen);
 			if(conn_soc == -1) {
 				cout << "Accept Error\n";
 				close(conn_soc);
@@ -201,6 +209,7 @@ void serverOperations() {
 			numberOfSockets++;
 			//add new socket to the vector
 			clientSockets.push_back(conn_soc);
+			changeInSockets = true;
 		}
 
 		//else its some work on the other socket
@@ -227,6 +236,7 @@ void serverOperations() {
 							FD_ZERO(&fds);
 							//add listening socket to set 
 							FD_SET(lstn_soc, &fds);
+							changeInSockets = true;
 						}
 
 						else {

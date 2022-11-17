@@ -41,7 +41,6 @@ string getHostName() {
 void printEpochTime() {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	//by default tv_usec gives 6 digits but we just want 2, so we divide by 10000
 	cout << tv.tv_sec << "." << (tv.tv_usec/10000);
 }
 
@@ -93,18 +92,18 @@ void clientConnection(int argc, char* argv[]) {
 	}
 	// Prepare sockaddr_in structure variable
 	//AF_INET for IPv4
-	memset(&address, '0', sizeof(address));
+	memset(&address, '0', sizeof address);
 	address.sin_family = AF_INET;
 	address.sin_port = htons(SERVER_PORT);
 
 	//converts custom IP address to binary form
-	if (inet_pton(AF_INET, SERVER_IP, &address.sin_addr) == -1) {
+	if (inet_pton(AF_INET, SERVER_IP, &address.sin_addr) <= 0) {
 		cout << "Convertion of IPv4 address from text to binary failed\n";
 		exit(1);
 	}
 
 	// connecting to the server socket
-	if (connect(serv_soc, (struct sockaddr *) &address, sizeof address) == -1) {
+	if (connect(serv_soc, (struct sockaddr *)&address, sizeof address) == -1) {
 		//cerror if connection not established
 		cout << "Cannot connect to the Server!\n";
 		close(serv_soc);
@@ -124,7 +123,7 @@ void clientWriteOperations() {
 	string input = "";
 
 	//input is guaranteed to be correct. So no try catch block implemented.
-	while (cin >> input) {
+	while (getline(cin, input)) {
 		if (input[0] == 'T') {
 			clientSleeping = false;
 			string outString = input.substr(1) + "." + getHostName();
