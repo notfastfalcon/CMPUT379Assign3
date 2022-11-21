@@ -149,35 +149,26 @@ void serverOperations() {
 	u_long n = 1;
 	ioctl(lstn_soc, FIONBIO, &n);
 
-	//The following code for select() is inspired from a GeeksForGeek Code 
-	//clear the socket set 
-	FD_ZERO(&fds);
-	//add listening socket to set 
-	FD_SET(lstn_soc, &fds);
-	//we need to track highest file descriptor number to use it for select()
-	maxSocketDesc = lstn_soc;
-
-	bool changeInSockets = false;
-
 	while(true) {
-		//if update on sockets
-		if (changeInSockets) {
-			//reset maxSocketDesc
-			maxSocketDesc = lstn_soc;
-			//add new sockets to set, ignore 0 as lstn_soc is at pos 0
-			for(int i = 1; i < numberOfSockets; i++) {
-				//get the socket descriptors from the vector
-				socketDesc = clientSockets[i];
-				//add socket decriptor to list
-				FD_SET(socketDesc, &fds);
-				//update the highest file descriptor
-				if(socketDesc > maxSocketDesc) {
-					maxSocketDesc = socketDesc;
-				}
+		//The following code for select() is inspired from a GeeksForGeek Code 
+		//clear the socket set 
+		FD_ZERO(&fds);
+		//add listening socket to set 
+		FD_SET(lstn_soc, &fds);
+		//track the maxSocketDesc
+		maxSocketDesc = lstn_soc;
+		
+		//add new sockets to set, ignore 0 as lstn_soc is at pos 0
+		for(int i = 1; i < numberOfSockets; i++) {
+			//get the socket descriptors from the vector
+			socketDesc = clientSockets[i];
+			//add socket decriptor to list
+			FD_SET(socketDesc, &fds);
+			//update the highest file descriptor
+			if(socketDesc > maxSocketDesc) {
+				maxSocketDesc = socketDesc;
 			}
 		}
-		//reset flag
-		changeInSockets = false;
 
 		struct timeval timeout = {30, 0}; //timeout after 30seconds of inactivity
 		int activity = select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout);
@@ -209,7 +200,6 @@ void serverOperations() {
 			numberOfSockets++;
 			//add new socket to the vector
 			clientSockets.push_back(conn_soc);
-			changeInSockets = true;
 		}
 
 		//else its some work on the other socket
@@ -232,11 +222,6 @@ void serverOperations() {
 							clientSockets.erase(i);
 							numberOfSockets--;
 							close(socketDesc);
-							//clear the socket set 
-							FD_ZERO(&fds);
-							//add listening socket to set 
-							FD_SET(lstn_soc, &fds);
-							changeInSockets = true;
 						}
 
 						else {

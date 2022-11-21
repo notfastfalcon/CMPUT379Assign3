@@ -15,7 +15,6 @@ using namespace std;
 struct sockaddr_in address;
 int serv_soc = 0;
 int totalTransactions = 0;
-bool clientSleeping = false;
 
 //tands.cpp function
 extern void Sleep(int n);
@@ -125,7 +124,6 @@ void clientWriteOperations() {
 	//input is guaranteed to be correct. So no try catch block implemented.
 	while (getline(cin, input)) {
 		if (input[0] == 'T') {
-			clientSleeping = false;
 			string outString = input.substr(1) + "." + getHostName();
 			char outBuffer[outString.length()] = {};
 			strcpy(outBuffer, outString.c_str());
@@ -141,15 +139,12 @@ void clientWriteOperations() {
 			totalTransactions++;
 		}
 		else if (input[0] == 'S') {
-			clientSleeping = true;
 			//put client to sleep
 			int units = stoi(input.substr(1));
 			cout << "Sleep " << units << " units\n";
 			Sleep(units);
 		}
-		if (!clientSleeping) {
-			clientReadOperations();
-		}
+		clientReadOperations();
 	}
 }
 
