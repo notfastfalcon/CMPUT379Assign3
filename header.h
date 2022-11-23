@@ -7,7 +7,7 @@
 // CLIENT FUNCTIONS
 void clientConnection(int, char*);
 std::string getHostName(void);
-void printEpochTime(void);
+std::string getTime(void);
 void loggedToFile(std::string);
 void clientWriteOperations(void);
 void clientReadOperations(void);
@@ -15,7 +15,7 @@ void closeConnection(void);
 void finalSummary(void);
 
 // SERVER FUNCTIONS
-void printEpochTime(void);
+std::string getTime(void);
 void loggedToFile(std::string);
 void printOutput(std::string, int, int);
 void addToUmap(std::string);

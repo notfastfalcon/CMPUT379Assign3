@@ -15,11 +15,12 @@
 #include "header.h"
 using namespace std;
 
-int lstn_soc, conn_soc, opt = 1, transNumber = 0;
-fd_set fds; 
+int lstn_soc, conn_soc, transNumber = 0;
+fd_set readFdSet; 
 
 struct sockaddr_in address; 
 struct timeval tv, startTime, endTime;
+struct timespec timeout = {30, 0}; //timeout after 30seconds of inactivity
 
 unordered_map<string, int> workForClient;
 vector<int> clientSockets;
@@ -30,9 +31,9 @@ extern void Trans(int n);
 /**
  * Prints the current EPOCH time 
  */
-void printEpochTime() {
+string getTime() {
 	gettimeofday(&tv, NULL);
-	cout << tv.tv_sec << "." << (tv.tv_usec/10000);
+	return to_string(tv.tv_sec) + "." + to_string(tv.tv_usec/10000);
 }
 
 
@@ -57,8 +58,7 @@ void loggedToFile(string filename) {
  * @param: flag: Flag to differentiate work and done outputs
  */
  void printOutput(string hostName, int work, int flag) {
- 	printEpochTime();
- 	cout << ":\t# " << transNumber << " (";
+ 	cout << getTime() << ":\t# " << transNumber << " (";
  	if(flag == 0) {
  		cout << "T" << work;
  	}
@@ -140,51 +140,47 @@ void serverConnection(int argc, char* argv[]) {
  * Handles main server operations
  */
 void serverOperations() {
-	int numberOfSockets = 1; //number of clients that are communicating
-	int maxSocketDesc = -1, socketDesc = -1;
-	clientSockets.push_back(lstn_soc);
 
-	//for timeout to work in select we need to set the socket as non-blocking
-	//Implementation highly inspired from stack overflow code.
-	u_long n = 1;
-	ioctl(lstn_soc, FIONBIO, &n);
+	//clear the socket set 
+	FD_ZERO(&readFdSet);
+	//add listening socket to set 
+	FD_SET(lstn_soc, &readFdSet);
+	int maxSocketDesc = lstn_soc;
+
+	bool changeInSockets = false;
 
 	while(true) {
-		//The following code for select() is inspired from a GeeksForGeek Code 
-		//clear the socket set 
-		FD_ZERO(&fds);
-		//add listening socket to set 
-		FD_SET(lstn_soc, &fds);
-		//track the maxSocketDesc
-		maxSocketDesc = lstn_soc;
-		
-		//add new sockets to set, ignore 0 as lstn_soc is at pos 0
-		for(int i = 1; i < numberOfSockets; i++) {
-			//get the socket descriptors from the vector
-			socketDesc = clientSockets[i];
-			//add socket decriptor to list
-			FD_SET(socketDesc, &fds);
-			//update the highest file descriptor
-			if(socketDesc > maxSocketDesc) {
-				maxSocketDesc = socketDesc;
+
+		//if update on sockets
+		if (changeInSockets) {
+			//reset maxSocketDesc
+			maxSocketDesc = lstn_soc;
+			//add new sockets to set, ignore 0 as lstn_soc is at pos 0
+			for(auto& socketDesc: clientSockets) {
+				//add socket decriptor to list
+				FD_SET(socketDesc, &readFdSet);
+				//update the highest file descriptor
+				if(socketDesc > maxSocketDesc) {
+					maxSocketDesc = socketDesc;
+				}
 			}
 		}
+		//reset flag
+		changeInSockets = false;
 
-		struct timeval timeout = {30, 0}; //timeout after 30seconds of inactivity
-		int activity = select(maxSocketDesc + 1, &fds, NULL, NULL, &timeout);
-		
+		int activity = pselect(maxSocketDesc+1, &readFdSet, NULL, NULL, &timeout, NULL);
 		if(activity == -1) {
 			cout << "Select Error!\n";
 			exit(1);
 		}
 
-		else if(activity == 0) {
+		if(activity == 0) {
 			//this is when the timer ran out
 			break;
 		}
 
 		//If something happened on the listening socket, then its an incoming connection 
-		if (FD_ISSET(lstn_soc, &fds)){
+		if (FD_ISSET(lstn_soc, &readFdSet)) {
 			// accept a connection request
 			int addressLen = sizeof address;
 			conn_soc = accept(lstn_soc, (struct sockaddr *)&address, (socklen_t*)&addressLen);
@@ -193,25 +189,18 @@ void serverOperations() {
 				close(conn_soc);
 				exit(1);
 			}
-			//setting new socket as non blocking as well.
-			n = 1;
-			ioctl(lstn_soc, FIONBIO, &n);
-			//update number of clients after a connection was accepted
-			numberOfSockets++;
 			//add new socket to the vector
 			clientSockets.push_back(conn_soc);
+			changeInSockets = true;
 		}
 
 		//else its some work on the other socket
 		else {
 			char inBuffer[1024] = {};
-			//we ignore clientSocket.begin() as there we have lstn_soc
-			for(auto i = clientSockets.begin() + 1; i < clientSockets.end(); i++) {
-				socketDesc = *i;
-				if (FD_ISSET(socketDesc, &fds)) {
-
-					int valread = read(socketDesc, inBuffer, sizeof inBuffer);
-					if(valread == -1) {
+			for(auto i = clientSockets.begin(); i < clientSockets.end(); i++) {
+				int socketDesc = *i;
+				if (FD_ISSET(socketDesc, &readFdSet)) {
+					if(read(socketDesc, inBuffer, sizeof inBuffer) == -1) {
 						cout << "Error reading from Client with Socket Description: " << socketDesc <<"\n";
 						exit(1);
 					}
@@ -220,17 +209,18 @@ void serverOperations() {
 					else {
 						if(inBuffer[0] == 'Q') {
 							clientSockets.erase(i);
-							numberOfSockets--;
 							close(socketDesc);
+							//clear the socket set 
+							FD_ZERO(&readFdSet);
+							//add listening socket to set 
+							FD_SET(lstn_soc, &readFdSet);
+							changeInSockets = true;
 						}
 
 						else {
-							string inString = "";
+							string inString(inBuffer);
 							string outString = "D";
-							//convert from cstring to string
-							for (unsigned int i = 0; i < strlen(inBuffer); i++) {
-								inString += inBuffer[i];
-							}
+							
 							//start timer after first transaction is received
 							//but do not reset it everytime
 							if(transNumber == 0) {
@@ -244,20 +234,20 @@ void serverOperations() {
 							printOutput(hostName, work, 0);
 							Trans(work);
 
+							//end time after last transaction is over (keep resetting in each iteration)
+							gettimeofday(&endTime, NULL);
+
 							outString += to_string(transNumber);
-							char outBuffer[outString.length()] = {};
-							strcpy(outBuffer, outString.c_str());
+						
 							//write done command to socket
-							send(conn_soc, outBuffer, sizeof outBuffer, 0);
+							send(conn_soc, outString.c_str(), outString.length(), 0);
 
 							printOutput(hostName, work, 1);
 							addToUMap(hostName);
-							//end time after last transaction is over (keep resetting in each iteration)
-							gettimeofday(&endTime, NULL);
 						}
 					}
 				}
-            }
+			}
 		}
 	}
 

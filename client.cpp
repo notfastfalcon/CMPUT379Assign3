@@ -15,10 +15,12 @@ using namespace std;
 struct sockaddr_in address;
 int serv_soc = 0;
 int totalTransactions = 0;
+bool clientSleeping = false;
 
 //tands.cpp function
 extern void Sleep(int n);
 
+struct timeval tv;
 
 /**
  * Gets the client ID i.e. machineName.pid
@@ -37,10 +39,9 @@ string getHostName() {
 /**
  * Prints the current EPOCH time 
  */
-void printEpochTime() {
-	struct timeval tv;
+string getTime() {
 	gettimeofday(&tv, NULL);
-	cout << tv.tv_sec << "." << (tv.tv_usec/10000);
+	return to_string(tv.tv_sec) + "." + to_string(tv.tv_usec/10000);
 }
 
 
@@ -124,27 +125,29 @@ void clientWriteOperations() {
 	//input is guaranteed to be correct. So no try catch block implemented.
 	while (getline(cin, input)) {
 		if (input[0] == 'T') {
+			clientSleeping = false;
 			string outString = input.substr(1) + "." + getHostName();
-			char outBuffer[outString.length()] = {};
-			strcpy(outBuffer, outString.c_str());
 
 			//write this command to socket
-			send(serv_soc, outBuffer, sizeof outBuffer, 0);
+			send(serv_soc, outString.c_str(), outString.length(), 0);
 
 			//write to log file
-			printEpochTime();
-			cout << ": Send (" << input << ")\n";
+
+			cout << getTime() <<  ": Send (" << input << ")\n";
 
 			//update transactions sent 
 			totalTransactions++;
 		}
 		else if (input[0] == 'S') {
+			clientSleeping = true;
 			//put client to sleep
 			int units = stoi(input.substr(1));
 			cout << "Sleep " << units << " units\n";
 			Sleep(units);
 		}
-		clientReadOperations();
+		if (!clientSleeping) {
+			clientReadOperations();
+		}
 	}
 }
 
@@ -153,7 +156,6 @@ void clientWriteOperations() {
  */
 void clientReadOperations() {
 	char inBuffer[3] = {};
-	string inString = "";
 
 	//read from socket
 	if (read(serv_soc, inBuffer, sizeof inBuffer) == -1) {
@@ -161,14 +163,11 @@ void clientReadOperations() {
 		exit(1);
 	}
 
-	//convert from cstring to string
-	for (unsigned int i = 0; i < strlen(inBuffer); i++) {
-		inString += inBuffer[i];
-	}
+	string inString(inBuffer);
+
 	if (!inString.empty()) {
 		//write to log file
-		printEpochTime();
-		cout << ": Recv (" << inString << ")\n";
+		cout << getTime() << ": Recv (" << inString << ")\n";
 	}
 }
 
