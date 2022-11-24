@@ -6,9 +6,14 @@ Server is responsible for interacting with multiple clients and handling each wo
 .SH SYNOPSIS
 server [SERVER_PORT]
 .SH ARGUMENTS
+The arguments of server as as follows:
+.PP
 Argument 1: Port Number that the server will read from (in the range 5000 to 64000, the same number that client uses)
 .SH BUGS
 No bugs known to the author. It worked as expected by the assignment description.
+.SH EXAMPLES
+.PP
+server 6000
 .SH SEE ALSO
 CLIENT(1)
 .SH AUTHOR

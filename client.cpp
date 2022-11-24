@@ -39,11 +39,11 @@ string getHostName() {
 /**
  * Prints the current EPOCH time 
  */
-string getTime() {
+void printTime() {
 	gettimeofday(&tv, NULL);
-	return to_string(tv.tv_sec) + "." + to_string(tv.tv_usec/10000);
+	cout << setfill('0');
+	cout << tv.tv_sec << "." << setw(2) << tv.tv_usec/10000;
 }
-
 
 /**
  * Redirect STDOUT to given Filename
@@ -126,14 +126,14 @@ void clientWriteOperations() {
 	while (getline(cin, input)) {
 		if (input[0] == 'T') {
 			clientSleeping = false;
-			string outString = input.substr(1) + "." + getHostName();
+			string outString = input.substr(1) + "." + getHostName() + "\n";
 
 			//write this command to socket
 			send(serv_soc, outString.c_str(), outString.length(), 0);
 
 			//write to log file
-
-			cout << getTime() <<  ": Send (" << input << ")\n";
+			printTime();
+			cout << ": Send (" << input << ")\n";
 
 			//update transactions sent 
 			totalTransactions++;
@@ -167,7 +167,8 @@ void clientReadOperations() {
 
 	if (!inString.empty()) {
 		//write to log file
-		cout << getTime() << ": Recv (" << inString << ")\n";
+		printTime();
+		cout << ": Recv (" << inString << ")\n";
 	}
 }
 
