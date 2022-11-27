@@ -15,7 +15,6 @@ using namespace std;
 struct sockaddr_in address;
 int serv_soc = 0;
 int totalTransactions = 0;
-bool clientSleeping = false;
 
 //tands.cpp function
 extern void Sleep(int n);
@@ -125,7 +124,6 @@ void clientWriteOperations() {
 	//input is guaranteed to be correct. So no try catch block implemented.
 	while (getline(cin, input)) {
 		if (input[0] == 'T') {
-			clientSleeping = false;
 			string outString = input.substr(1) + "." + getHostName() + "\n";
 
 			//write this command to socket
@@ -137,16 +135,13 @@ void clientWriteOperations() {
 
 			//update transactions sent 
 			totalTransactions++;
+			clientReadOperations();
 		}
 		else if (input[0] == 'S') {
-			clientSleeping = true;
 			//put client to sleep
 			int units = stoi(input.substr(1));
 			cout << "Sleep " << units << " units\n";
 			Sleep(units);
-		}
-		if (!clientSleeping) {
-			clientReadOperations();
 		}
 	}
 }
@@ -164,21 +159,15 @@ void clientReadOperations() {
 	}
 
 	string inString(inBuffer);
-
-	if (!inString.empty()) {
-		//write to log file
-		printTime();
-		cout << ": Recv (" << inString << ")\n";
-	}
+	//write to log file
+	printTime();
+	cout << ": Recv (" << inString << ")\n";
 }
 
 /**
  * Close all sockets and send terminating message to server
  */
 void closeConnection() {
-	//send that all work is done to server
-	char outBuffer[2] = {'Q'};
-	send(serv_soc, outBuffer, sizeof outBuffer, 0);
 	close(serv_soc);
 }
 

@@ -143,18 +143,14 @@ void serverConnection(int argc, char* argv[]) {
  */
 void serverOperations() {
 	int maxSocketDesc = -1;
-	//clear the Fd set
-	FD_ZERO(&readFdSet);
-	//set the lstn_soc
-	FD_SET(lstn_soc, &readFdSet);
-
 	while(true) {
+		//clear to the set to reset
+		FD_ZERO(&readFdSet);
+		FD_SET(lstn_soc, &readFdSet);
 		maxSocketDesc = lstn_soc;
 		for(auto& socketDesc: clientSockets) {
 			//add all activie sets to fdSet
-			if(socketDesc > 0) {
-				FD_SET(socketDesc, &readFdSet);
-			}
+			FD_SET(socketDesc, &readFdSet);
 			if(maxSocketDesc < socketDesc) {
 				maxSocketDesc = socketDesc;
 			}
@@ -186,51 +182,45 @@ void serverOperations() {
 			int socket = *i;
 			if(FD_ISSET(socket, &readFdSet)) {
 				char inBuffer[1024] = {};
-				if(read(socket, inBuffer, sizeof inBuffer) == -1) {
+				int valread = read(socket, inBuffer, sizeof inBuffer);
+				if(valread == -1) {
 					cout << "Error reading from Client with Socket Description: " << socket <<"\n";
 					exit(1);
 				}
 
 				//do the transaction
+				else if(valread == 0) {
+					clientSockets.erase(i);
+					close(socket);
+				}
+
 				else {
-					//server only need to end if EOF reached by client or server waits
-					if(inBuffer[0] == 'Q') {
-						clientSockets.erase(i);
-						close(socket);
-						//clear to the set to reset
-						FD_ZERO(&readFdSet);
-						FD_SET(lstn_soc, &readFdSet);
-					}
-
-					else {
-						string inString(inBuffer);
-						string outString = "D";
-						
-						//start timer after first transaction is received
-						//but do not reset it everytime
-						if(transNumber == 0) {
-							gettimeofday(&startTime, NULL);
-						}
-						size_t posOfFirstDot = inString.find('.');
-						size_t posOfEndLine = inString.find('\n');
-						int work = stoi(inString.substr(0, posOfFirstDot));
-						string hostName = inString.substr(posOfFirstDot + 1, posOfEndLine-posOfFirstDot-1); 
-						transNumber++;
-
-						printOutput(hostName, work, 0);
-						Trans(work);
-
-						//end time after last transaction is over (keep resetting in each iteration)
-						gettimeofday(&endTime, NULL);
-
-						outString += to_string(transNumber);
+					string inString(inBuffer);
+					string outString = "D";
 					
-						//write done command to socket
-						send(conn_soc, outString.c_str(), outString.length(), 0);
-
-						printOutput(hostName, work, 1);
-						addToUMap(hostName);
+					//start timer after first transaction is received
+					//but do not reset it everytime
+					if(transNumber == 0) {
+						gettimeofday(&startTime, NULL);
 					}
+					size_t posOfFirstDot = inString.find('.');
+					size_t posOfEndLine = inString.find('\n');
+					int work = stoi(inString.substr(0, posOfFirstDot));
+					string hostName = inString.substr(posOfFirstDot + 1, posOfEndLine-posOfFirstDot-1); 
+					transNumber++;
+
+					printOutput(hostName, work, 0);
+					Trans(work);
+
+					//end time after last transaction is over (keep resetting in each iteration)
+					gettimeofday(&endTime, NULL);
+
+					outString += to_string(transNumber);
+					//write done command to socket
+					send(socket, outString.c_str(), outString.length(), 0);
+
+					printOutput(hostName, work, 1);
+					addToUMap(hostName);
 				}
 			}
 		}
