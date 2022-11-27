@@ -150,7 +150,7 @@ void clientWriteOperations() {
  * Main Client Read Operations
  */
 void clientReadOperations() {
-	char inBuffer[3] = {};
+	char inBuffer[1024] = {};
 
 	//read from socket
 	if (read(serv_soc, inBuffer, sizeof inBuffer) == -1) {
