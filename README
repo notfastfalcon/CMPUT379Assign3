@@ -28,11 +28,10 @@ Makefile Targets:
 
 
 Code Design:
-	1. The client and server communicate using sockets. The server uses the Select() command to synchronously take work from
+	1. The client and server communicate using sockets. The server uses the pselect() command to synchronously take work from
 	multiple clients. It uses the fd_set data structure.
-	2. The server timesout after 30 seconds of inactivity on any othe socket connections. To implement timeout the sockets were
-	made to be non-blocking.
-	3. The after the client is done reading the input it send a 'Q' indication to the server to close the connection.
+	2. The server timesout after 30 seconds of inactivity on any othe socket connections. 
+	3. The after the client is done reading the input it send an indication to the server to close the connection.
 	4. After the server timesout, the summary is printed out.
 	5. The code compiles on the lab machine and runs with multiple machines.
 
